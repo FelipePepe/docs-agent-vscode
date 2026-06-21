@@ -114,10 +114,14 @@ export class GraphPanel {
       for (const full of suffixMap.get(e.callee) ?? []) bump(full);
     }
     for (const e of this.graph.implementsEdges) {
-      bump(e.implementor, 2); bump(e.contract, 2);
+      if (degree.has(e.implementor) && degree.has(e.contract)) {
+        bump(e.implementor, 2); bump(e.contract, 2);
+      }
     }
     for (const e of this.graph.injectsEdges) {
-      bump(e.consumer); bump(e.dependency, 2);
+      if (degree.has(e.consumer) && degree.has(e.dependency)) {
+        bump(e.consumer); bump(e.dependency, 2);
+      }
     }
     for (const e of this.graph.tableEdges) {
       bump(e.symbol);
@@ -155,7 +159,6 @@ export class GraphPanel {
       for (const full of suffixMap.get(e.callee) ?? []) {
         if (nodeSet.has(full) && full !== e.caller) {
           edgeList.push({ source: e.caller, target: full, label: 'calls' });
-          break;
         }
       }
     }
