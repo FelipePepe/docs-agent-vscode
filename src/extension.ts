@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { buildContext, formatContextBundle } from './context';
 import { DOC_TYPES } from './doctypes';
 import { CodeGraph, ImpactSummary } from './graph';
+import { initDb, loadGraph as loadGraphFromDb, saveGraph } from './db';
 import { buildGraph } from './indexer';
 import { chat, getLlmConfig } from './llm';
 import { GraphPanel } from './panel';
@@ -30,12 +31,21 @@ function loadPrimerFile(name: string): string {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  // Build the workspace graph in the background — does not block activation.
+  initDb(context.globalStorageUri.fsPath);
+
+  // Load graph from DB cache first; fall back to full index if no snapshot exists.
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (workspaceRoot) {
     setImmediate(() => {
-      codeGraph = buildGraph(workspaceRoot);
-      console.log(`[Docs Agent] Graph ready — ${codeGraph.nodeCount} nodes, ${codeGraph.edgeCount} edges`);
+      const cached = loadGraphFromDb(workspaceRoot);
+      if (cached) {
+        codeGraph = cached;
+        console.log(`[Docs Agent] Graph loaded from DB — ${codeGraph.nodeCount} nodes, ${codeGraph.edgeCount} edges`);
+      } else {
+        codeGraph = buildGraph(workspaceRoot);
+        saveGraph(workspaceRoot, codeGraph);
+        console.log(`[Docs Agent] Graph indexed and saved — ${codeGraph.nodeCount} nodes, ${codeGraph.edgeCount} edges`);
+      }
     });
   }
 

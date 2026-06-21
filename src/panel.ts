@@ -1,12 +1,14 @@
 import * as vscode from 'vscode';
 import { CodeGraph } from './graph';
 import { buildGraph } from './indexer';
+import { saveGraph } from './db';
 
 type WebviewMessage =
   | { type: 'search';   query: string  }
   | { type: 'expand';   nodeId: string }
   | { type: 'overview'                 }
-  | { type: 'reload'                   };
+  | { type: 'reload'                   }
+  | { type: 'openFile'; file: string; line?: number };
 
 export class GraphPanel {
   private static instance: GraphPanel | undefined;
@@ -69,7 +71,16 @@ export class GraphPanel {
       case 'expand':   this.sendSubgraph(msg.nodeId);     break;
       case 'overview': this.sendOverviewGraph();          break;
       case 'reload':   this.reloadGraph();                break;
+      case 'openFile': this.openFile(msg.file, msg.line); break;
     }
+  }
+
+  private async openFile(file: string, line?: number): Promise<void> {
+    const doc = await vscode.workspace.openTextDocument(file);
+    const selection = line !== undefined
+      ? new vscode.Range(line - 1, 0, line - 1, 0)
+      : undefined;
+    await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside, selection });
   }
 
   private reloadGraph(): void {
@@ -79,6 +90,7 @@ export class GraphPanel {
     this.panel.webview.postMessage({ type: 'reloading' });
     setImmediate(() => {
       this.graph = buildGraph(root);
+      saveGraph(root, this.graph);
       this.panel.webview.postMessage({
         type:      'stats',
         nodeCount: this.graph.nodeCount,
@@ -297,6 +309,8 @@ export class GraphPanel {
       placeholder="Search symbol… class, method, or table"
       autocomplete="off" spellcheck="false" />
     <span id="stats"></span>
+    <button class="toolbar-btn" id="btn-zoom-in"  title="Zoom in">+</button>
+    <button class="toolbar-btn" id="btn-zoom-out" title="Zoom out">−</button>
     <button class="toolbar-btn" id="btn-overview" title="Return to overview graph">Overview</button>
     <button class="toolbar-btn" id="btn-clear"    title="Clear the graph canvas">Clear</button>
     <button class="toolbar-btn" id="btn-reload"   title="Re-scan source files and rebuild the graph">↺ Re-index</button>
