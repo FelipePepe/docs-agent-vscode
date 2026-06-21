@@ -11,7 +11,7 @@ import { GraphPanel } from './panel';
 import { buildProjectContext } from './project-context';
 import { SettingsPanel } from './settings-panel';
 import { OUTPUT_SCHEMA_INSTRUCTION, renderMarkdown, validateAndParse } from './schema';
-import { openDoc, writeDoc } from './writer';
+import { normalizeMermaidBlocks, openDoc, writeDoc } from './writer';
 
 const PRIMERS_DIR = path.join(__dirname, '..', 'src', 'primers');
 let codeGraph: CodeGraph | null = null;
@@ -235,7 +235,7 @@ ${codeBundle}`;
               const relOut   = filename === 'README.md' ? filename : `${docsFolder}/${filename}`;
               const absOut  = path.join(root, relOut);
               fs.mkdirSync(path.dirname(absOut), { recursive: true });
-              fs.writeFileSync(absOut, content, 'utf8');
+              fs.writeFileSync(absOut, normalizeMermaidBlocks(content), 'utf8');
               generated.push(relOut);
             } catch (err) {
               const msg = (err as Error).message;
