@@ -100,6 +100,14 @@ export class CodeGraph {
     return { callers, tableRefs, implementors, consumers };
   }
 
+  // Reverse-query: every symbol that references a given table.
+  queryByTable(tableName: string): { symbol: string; file: string; line: number; operation: SqlOperation }[] {
+    const lower = tableName.toLowerCase();
+    return this.tableEdges
+      .filter(e => e.table.toLowerCase() === lower)
+      .map(e => ({ symbol: e.symbol, file: e.file, line: e.line, operation: e.operation }));
+  }
+
   get nodeCount(): number { return this.nodes.size; }
 
   get edgeCount(): number {

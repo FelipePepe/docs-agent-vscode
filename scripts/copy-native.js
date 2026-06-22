@@ -1,0 +1,36 @@
+const fs   = require('fs');
+const path = require('path');
+
+const root    = path.resolve(__dirname, '..');
+const distMod = path.resolve(root, 'dist/node_modules');
+
+// Clean previous run
+fs.rmSync(distMod, { recursive: true, force: true });
+fs.mkdirSync(distMod, { recursive: true });
+
+// Resolve the real path of better-sqlite3 (pnpm uses a symlink)
+const bsLink = path.resolve(root, 'node_modules/better-sqlite3');
+const bsSrc  = fs.realpathSync(bsLink);
+const bsDst  = path.resolve(distMod, 'better-sqlite3');
+fs.cpSync(bsSrc, bsDst, { recursive: true });
+
+// Minimal `bindings` shim — loads the .node file directly, no transitive deps
+const bindingsDst = path.resolve(distMod, 'bindings');
+fs.mkdirSync(bindingsDst, { recursive: true });
+fs.writeFileSync(path.join(bindingsDst, 'package.json'), JSON.stringify({ name: 'bindings', main: 'bindings.js' }));
+fs.writeFileSync(path.join(bindingsDst, 'bindings.js'), [
+  "module.exports = function bindings(name) {",
+  "  var n = typeof name === 'string' ? name : name.bindings;",
+  "  return require('../better-sqlite3/build/Release/' + n);",
+  "};",
+].join('\n'));
+
+console.log('better-sqlite3 + bindings shim written to dist/node_modules');
+
+// Bump patch version in package.json
+const pkgPath = path.resolve(root, 'package.json');
+const pkg     = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+const [major, minor, patch] = pkg.version.split('.').map(Number);
+pkg.version = `${major}.${minor}.${patch + 1}`;
+fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+console.log(`version bumped to ${pkg.version}`);

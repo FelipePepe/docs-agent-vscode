@@ -28,19 +28,25 @@ type InboundMsg =
   | { type: 'stats';         nodeCount: number; edgeCount: number }
   | { type: 'searchResults'; results: GraphNode[] }
   | { type: 'subgraph';      centerId: string; nodes: GraphNode[]; edges: GraphEdge[] }
-  | { type: 'reloading' };
+  | { type: 'reloading' }
+  | { type: 'queryAnswer';   question: string; lines: string[] };
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
-const graphDiv    = document.getElementById('graph')!;
-const searchEl    = document.getElementById('search')    as HTMLInputElement;
-const resultsEl   = document.getElementById('results')!;
-const detailEl    = document.getElementById('detail')!;
-const statsEl     = document.getElementById('stats')!;
-const btnZoomIn   = document.getElementById('btn-zoom-in')  as HTMLButtonElement;
-const btnZoomOut  = document.getElementById('btn-zoom-out') as HTMLButtonElement;
-const btnOverview = document.getElementById('btn-overview') as HTMLButtonElement;
-const btnClear    = document.getElementById('btn-clear')    as HTMLButtonElement;
-const btnReload   = document.getElementById('btn-reload')   as HTMLButtonElement;
+const graphDiv      = document.getElementById('graph')!;
+const searchEl      = document.getElementById('search')       as HTMLInputElement;
+const resultsEl     = document.getElementById('results')!;
+const detailEl      = document.getElementById('detail')!;
+const statsEl       = document.getElementById('stats')!;
+const btnZoomIn     = document.getElementById('btn-zoom-in')   as HTMLButtonElement;
+const btnZoomOut    = document.getElementById('btn-zoom-out')  as HTMLButtonElement;
+const btnOverview   = document.getElementById('btn-overview')  as HTMLButtonElement;
+const btnClear      = document.getElementById('btn-clear')     as HTMLButtonElement;
+const btnReload     = document.getElementById('btn-reload')    as HTMLButtonElement;
+const queryKindEl   = document.getElementById('query-kind')    as HTMLSelectElement;
+const queryTargetEl = document.getElementById('query-target')  as HTMLInputElement;
+const btnQuery      = document.getElementById('btn-query')     as HTMLButtonElement;
+const btnQueryClear = document.getElementById('btn-query-clear') as HTMLButtonElement;
+const queryAnswerEl = document.getElementById('query-answer')!;
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 const KIND_HEX: Record<string, number> = {
@@ -588,6 +594,34 @@ function showDetail(node: SimNode | null): void {
     <div class="detail-sub" style="color:var(--vscode-textLink-foreground)">${esc(node.id)}</div>`;
 }
 
+// ── Query bar ─────────────────────────────────────────────────────────────────
+function showQueryAnswer(question: string, lines: string[]): void {
+  const isEmpty = lines.length === 1 && lines[0].startsWith('No ');
+  queryAnswerEl.innerHTML =
+    `<div class="qa-question">${esc(question)}</div>` +
+    lines.map(l => `<div class="${isEmpty ? 'qa-empty' : 'qa-row'}">${isEmpty ? esc(l) : '• ' + esc(l)}</div>`).join('');
+  queryAnswerEl.style.display = 'block';
+}
+
+function fireQuery(): void {
+  const target = queryTargetEl.value.trim();
+  if (!target) return;
+  vscode.postMessage({ type: 'query', kind: queryKindEl.value, target });
+}
+
+btnQuery.addEventListener('click', fireQuery);
+
+queryTargetEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter') fireQuery();
+  if (e.key === 'Escape') { queryTargetEl.blur(); }
+});
+
+btnQueryClear.addEventListener('click', () => {
+  queryAnswerEl.style.display = 'none';
+  queryAnswerEl.innerHTML = '';
+  queryTargetEl.value = '';
+});
+
 // ── Toolbar buttons ───────────────────────────────────────────────────────────
 btnZoomIn.addEventListener('click', () => {
   sph.radius = Math.max(80, sph.radius * 0.7);
@@ -635,6 +669,9 @@ window.addEventListener('message', ({ data }: MessageEvent<InboundMsg>) => {
       break;
     case 'reloading':
       statsEl.textContent = 'Indexing…';
+      break;
+    case 'queryAnswer':
+      showQueryAnswer(data.question, data.lines);
       break;
   }
 });
