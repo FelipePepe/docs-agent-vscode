@@ -8,7 +8,8 @@ type WebviewMessage =
   | { type: 'expand';   nodeId: string }
   | { type: 'overview'                 }
   | { type: 'reload'                   }
-  | { type: 'openFile'; file: string; line?: number };
+  | { type: 'openFile'; file: string; line?: number }
+  | { type: 'query';    kind: string; target: string };
 
 export class GraphPanel {
   private static instance: GraphPanel | undefined;
@@ -67,11 +68,12 @@ export class GraphPanel {
 
   private onMessage(msg: WebviewMessage): void {
     switch (msg.type) {
-      case 'search':   this.sendSearchResults(msg.query); break;
-      case 'expand':   this.sendSubgraph(msg.nodeId);     break;
-      case 'overview': this.sendOverviewGraph();          break;
-      case 'reload':   this.reloadGraph();                break;
-      case 'openFile': this.openFile(msg.file, msg.line); break;
+      case 'search':   this.sendSearchResults(msg.query);          break;
+      case 'expand':   this.sendSubgraph(msg.nodeId);             break;
+      case 'overview': this.sendOverviewGraph();                  break;
+      case 'reload':   this.reloadGraph();                        break;
+      case 'openFile': this.openFile(msg.file, msg.line);         break;
+      case 'query':    this.sendQueryResult(msg.kind, msg.target); break;
     }
   }
 
@@ -279,6 +281,99 @@ export class GraphPanel {
     });
   }
 
+  private sendQueryResult(kind: string, target: string): void {
+    let question = '';
+    let lines: string[] = [];
+    const nodeSet  = new Set<string>();
+    const edgeList: { source: string; target: string; label: string }[] = [];
+
+    switch (kind) {
+      case 'tables-for-symbol': {
+        const { tableRefs } = this.graph.queryImpact(target);
+        question = `Tables touched by "${target}"`;
+        if (tableRefs.length === 0) {
+          lines = ['No table references found.'];
+        } else {
+          nodeSet.add(target);
+          for (const t of tableRefs) {
+            const tid = `table:${t.table}`;
+            nodeSet.add(tid);
+            edgeList.push({ source: target, target: tid, label: t.operation });
+            lines.push(`${t.table} — ${t.operation}  (${t.file.split('/').pop()}:${t.line})`);
+          }
+        }
+        break;
+      }
+      case 'callers-of': {
+        const { callers } = this.graph.queryImpact(target);
+        question = `Callers of "${target}"`;
+        if (callers.length === 0) {
+          lines = ['No callers found.'];
+        } else {
+          nodeSet.add(target);
+          for (const c of callers) {
+            nodeSet.add(c.symbol);
+            edgeList.push({ source: c.symbol, target, label: 'calls' });
+            lines.push(`${c.symbol}  (${c.file.split('/').pop()}:${c.line})`);
+          }
+        }
+        break;
+      }
+      case 'consumers-of': {
+        const { consumers } = this.graph.queryImpact(target);
+        question = `Injectors of "${target}"`;
+        if (consumers.length === 0) {
+          lines = ['No injectors found.'];
+        } else {
+          nodeSet.add(target);
+          for (const c of consumers) {
+            nodeSet.add(c.symbol);
+            edgeList.push({ source: c.symbol, target, label: 'injects' });
+            lines.push(`${c.symbol}  via ${c.fieldName}`);
+          }
+        }
+        break;
+      }
+      case 'methods-for-table': {
+        const refs = this.graph.queryByTable(target);
+        question = `Methods touching table "${target}"`;
+        if (refs.length === 0) {
+          lines = ['No methods found referencing this table.'];
+        } else {
+          const tid = `table:${target}`;
+          nodeSet.add(tid);
+          for (const r of refs) {
+            nodeSet.add(r.symbol);
+            edgeList.push({ source: r.symbol, target: tid, label: r.operation });
+            lines.push(`${r.symbol} — ${r.operation}  (${r.file.split('/').pop()}:${r.line})`);
+          }
+        }
+        break;
+      }
+    }
+
+    this.panel.webview.postMessage({ type: 'queryAnswer', question, lines });
+
+    if (nodeSet.size > 1) {
+      const centerId = kind === 'methods-for-table' ? `table:${target}` : target;
+      const nodeList = [...nodeSet].map(id => {
+        if (id.startsWith('table:')) {
+          return { id, label: id.slice(6), kind: 'table' };
+        }
+        const n = this.graph.nodes.get(id);
+        return n
+          ? { id, label: n.symbol.split('.').pop() ?? n.symbol, kind: n.kind, file: n.file, line: n.line }
+          : { id, label: id.split('.').pop() ?? id, kind: 'unknown' };
+      });
+      this.panel.webview.postMessage({
+        type: 'subgraph',
+        centerId,
+        nodes: nodeList,
+        edges: dedupeEdges(edgeList),
+      });
+    }
+  }
+
   // ── HTML shell ────────────────────────────────────────────────────────────
 
   private buildHtml(ctx: vscode.ExtensionContext): string {
@@ -315,6 +410,20 @@ export class GraphPanel {
     <button class="toolbar-btn" id="btn-clear"    title="Clear the graph canvas">Clear</button>
     <button class="toolbar-btn" id="btn-reload"   title="Re-scan source files and rebuild the graph">↺ Re-index</button>
   </div>
+  <div id="query-bar">
+    <select id="query-kind">
+      <option value="tables-for-symbol">Tables touched by…</option>
+      <option value="callers-of">Callers of…</option>
+      <option value="consumers-of">Injectors of…</option>
+      <option value="methods-for-table">Methods touching table…</option>
+    </select>
+    <input id="query-target" type="text"
+      placeholder="symbol or table name"
+      autocomplete="off" spellcheck="false" />
+    <button class="toolbar-btn" id="btn-query">Ask ↵</button>
+    <button class="toolbar-btn" id="btn-query-clear" title="Clear answer">✕</button>
+  </div>
+  <div id="query-answer"></div>
   <div id="results"></div>
   <div id="graph"></div>
   <div id="detail"></div>

@@ -177,3 +177,82 @@ body {
   font-family: var(--vscode-editor-font-family, monospace);
   color: var(--vscode-descriptionForeground);
 }
+
+/* ── Query bar ───────────────────────────────────── */
+
+#query-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editorGroupHeader-tabsBackground);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 19;
+}
+
+#query-kind {
+  padding: 4px 8px;
+  border: 1px solid var(--vscode-dropdown-border);
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  border-radius: 4px;
+  outline: none;
+  flex-shrink: 0;
+}
+#query-kind:focus { border-color: var(--vscode-focusBorder); }
+
+#query-target {
+  flex: 1;
+  padding: 4px 10px;
+  border: 1px solid var(--vscode-input-border);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--vscode-font-size);
+  border-radius: 4px;
+  outline: none;
+}
+#query-target:focus { border-color: var(--vscode-focusBorder); }
+#query-target::placeholder { color: var(--vscode-input-placeholderForeground); }
+
+/* ── Query answer panel ──────────────────────────── */
+
+#query-answer {
+  display: none;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editor-background);
+  max-height: 130px;
+  overflow-y: auto;
+}
+
+.qa-question {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--vscode-foreground);
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.qa-row {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  color: var(--vscode-foreground);
+  padding: 1px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qa-empty {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
