@@ -1,0 +1,8 @@
+src/**
+!src/primers/**
+node_modules/**
+tsconfig.json
+.gitignore
+.claude/
+pnpm-lock.yaml
+pnpm-workspace.yaml
