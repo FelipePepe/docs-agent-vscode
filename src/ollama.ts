@@ -18,7 +18,13 @@ export function getOllamaConfig(): OllamaConfig {
   };
 }
 
-export async function chat(messages: OllamaMessage[], config: OllamaConfig): Promise<string> {
+export interface OllamaResult {
+  content:          string;
+  promptTokens:     number;
+  completionTokens: number;
+}
+
+export async function chat(messages: OllamaMessage[], config: OllamaConfig): Promise<OllamaResult> {
   let response: Response;
 
   try {
@@ -46,6 +52,8 @@ export async function chat(messages: OllamaMessage[], config: OllamaConfig): Pro
   const chunks: string[] = [];
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
+  let promptTokens     = 0;
+  let completionTokens = 0;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -59,11 +67,16 @@ export async function chat(messages: OllamaMessage[], config: OllamaConfig): Pro
         if (parsed.message?.content) {
           chunks.push(parsed.message.content);
         }
+        // Final chunk (done: true) carries token counts.
+        if (parsed.done === true) {
+          promptTokens     = parsed.prompt_eval_count ?? 0;
+          completionTokens = parsed.eval_count        ?? 0;
+        }
       } catch {
         // incomplete JSON chunk — skip
       }
     }
   }
 
-  return chunks.join('');
+  return { content: chunks.join(''), promptTokens, completionTokens };
 }

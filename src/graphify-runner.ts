@@ -94,6 +94,24 @@ export function runGraphify(
   });
 }
 
+// ── graph.json metadata ───────────────────────────────────────────────────────
+
+export interface GraphInfo {
+  exists:    boolean;
+  mtimeMs:   number | null;
+  sizeBytes: number | null;
+}
+
+export function getGraphInfo(workspaceRoot: string): GraphInfo {
+  const p = graphOutPath(workspaceRoot);
+  try {
+    const stat = fs.statSync(p);
+    return { exists: true, mtimeMs: stat.mtimeMs, sizeBytes: stat.size };
+  } catch {
+    return { exists: false, mtimeMs: null, sizeBytes: null };
+  }
+}
+
 // ── graph.json I/O ────────────────────────────────────────────────────────────
 
 export function loadGraphJson(workspaceRoot: string): GraphifyJson | null {
