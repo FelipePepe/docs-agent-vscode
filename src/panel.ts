@@ -1,9 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { CodeGraph } from './graph';
-import { buildGraph } from './indexer';
-import { saveGraph } from './db';
+import { CodeGraph, fromGraphifyJson } from './graph';
+import { loadGraphJson, runGraphify } from './graphify-runner';
 
 type WebviewMessage =
   | { type: 'search';   query: string  }
@@ -112,18 +111,20 @@ export class GraphPanel {
     if (folders.length === 0) return;
 
     this.panel.webview.postMessage({ type: 'reloading' });
-    setImmediate(() => {
+    void (async () => {
       try {
         const merged = new CodeGraph();
         for (const folder of folders) {
           const root = folder.uri.fsPath;
-          const g = buildGraph(root);
-          saveGraph(root, g);
-          for (const node of g.nodes.values())   merged.addNode(node);
-          for (const e of g.callEdges)           merged.addCallEdge(e);
-          for (const e of g.tableEdges)          merged.addTableEdge(e);
-          for (const e of g.implementsEdges)     merged.addImplementsEdge(e);
-          for (const e of g.injectsEdges)        merged.addInjectsEdge(e);
+          await runGraphify(root, true);   // incremental update — AST-only, no LLM cost
+          const json = loadGraphJson(root);
+          if (!json) continue;
+          const g = fromGraphifyJson(json, root);
+          for (const node of g.nodes.values())    merged.addNode(node);
+          for (const e of g.callEdges)            merged.addCallEdge(e);
+          for (const e of g.tableEdges)           merged.addTableEdge(e);
+          for (const e of g.implementsEdges)      merged.addImplementsEdge(e);
+          for (const e of g.injectsEdges)         merged.addInjectsEdge(e);
         }
         this.graph = merged;
         this.panel.webview.postMessage({
@@ -135,7 +136,7 @@ export class GraphPanel {
       } catch (err) {
         vscode.window.showErrorMessage(`Docs Agent: Re-index failed — ${(err as Error).message}`);
       }
-    });
+    })();
   }
 
   private sendOverviewGraph(): void {
@@ -197,7 +198,7 @@ export class GraphPanel {
         return { id, label: id.slice(6), kind: 'table' };
       }
       const n = this.graph.nodes.get(id)!;
-      return { id, label: n.symbol.split('.').pop() ?? n.symbol, kind: n.kind, file: n.file, line: n.line };
+      return { id, label: n.label ?? n.symbol.split('.').pop() ?? n.symbol, kind: n.kind, file: n.file, line: n.line };
     });
 
     // Build edges between included nodes, resolving call callees via suffix map
@@ -243,11 +244,11 @@ export class GraphPanel {
   private sendSearchResults(query: string): void {
     const q = query.toLowerCase();
     const results = [...this.graph.nodes.values()]
-      .filter(n => n.symbol.toLowerCase().includes(q))
+      .filter(n => n.symbol.toLowerCase().includes(q) || (n.label ?? '').toLowerCase().includes(q))
       .slice(0, 20)
       .map(n => ({
         id:    n.symbol,
-        label: n.symbol.split('.').pop() ?? n.symbol,
+        label: n.label ?? n.symbol.split('.').pop() ?? n.symbol,
         kind:  n.kind,
         file:  n.file,
         line:  n.line,

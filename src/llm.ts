@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { chat as ollamaChat } from './ollama';
+import { recordTokenUsage } from './token-store';
 
 export type Provider = 'ollama' | 'vscode-lm';
 
@@ -25,26 +26,41 @@ export function getLlmConfig(): LlmConfig {
   };
 }
 
+let _activeCommand = 'unknown';
+export const activeCommand = { get current() { return _activeCommand; } };
+export function setActiveCommand(cmd: string) { _activeCommand = cmd; }
+
 export async function chat(
   messages: LlmMessage[],
   config: LlmConfig,
   token?: vscode.CancellationToken
 ): Promise<string> {
   if (config.provider === 'vscode-lm') {
-    return chatVsCodeLm(messages, config.vscodeLmFamily, token);
+    const { content, promptTokens, completionTokens } =
+      await chatVsCodeLm(messages, config.vscodeLmFamily, token);
+    recordTokenUsage({
+      timestamp: Date.now(), provider: 'vscode-lm', model: config.vscodeLmFamily || 'default',
+      command: activeCommand.current, promptTokens, completionTokens,
+    });
+    return content;
   }
-  return ollamaChat(
+
+  const result = await ollamaChat(
     messages.map(m => ({ role: m.role, content: m.content })),
     { url: config.ollamaUrl, model: config.ollamaModel },
-    token
   );
+  recordTokenUsage({
+    timestamp: Date.now(), provider: 'ollama', model: config.ollamaModel,
+    command: activeCommand.current, promptTokens: result.promptTokens, completionTokens: result.completionTokens,
+  });
+  return result.content;
 }
 
 async function chatVsCodeLm(
   messages: LlmMessage[],
   family: string,
   token?: vscode.CancellationToken
-): Promise<string> {
+): Promise<{ content: string; promptTokens: number; completionTokens: number }> {
   const selector = family ? { family } : {};
   const models   = await vscode.lm.selectChatModels(selector);
 
@@ -72,15 +88,20 @@ async function chatVsCodeLm(
     }
   }
 
-  const cts = new vscode.CancellationTokenSource();
-  try {
-    const response = await model.sendRequest(lmMessages, {}, token ?? cts.token);
-    let result = '';
-    for await (const chunk of response.text) {
-      result += chunk;
-    }
-    return result;
-  } finally {
-    cts.dispose();
+  const cts      = new vscode.CancellationTokenSource();
+  const response = await model.sendRequest(lmMessages, {}, token ?? cts.token);
+
+  let content = '';
+  for await (const chunk of response.text) {
+    content += chunk;
   }
+  cts.dispose();
+
+  // VS Code LM exposes usage on the response in VS Code ≥ 1.91.
+  const usage = (response as unknown as { usage?: { inputTokens?: number; outputTokens?: number } }).usage;
+  return {
+    content,
+    promptTokens:     usage?.inputTokens  ?? 0,
+    completionTokens: usage?.outputTokens ?? 0,
+  };
 }
