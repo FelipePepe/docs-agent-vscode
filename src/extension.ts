@@ -3,9 +3,10 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { buildContext, formatContextBundle } from './context';
 import { DOC_TYPES } from './doctypes';
+import { DashboardPanel } from './dashboard-panel';
 import { CodeGraph, ImpactSummary, fromGraphifyJson } from './graph';
 import { findGraphify, graphOutPath, loadGraphJson, promptInstall, runGraphify, watchGraphJson } from './graphify-runner';
-import { chat, getLlmConfig } from './llm';
+import { chat, getLlmConfig, setActiveCommand } from './llm';
 import { GraphPanel } from './panel';
 import { buildProjectContext } from './project-context';
 import { SettingsPanel } from './settings-panel';
@@ -88,6 +89,7 @@ ${codeBundle}`;
 
           const providerLabel = config.provider === 'vscode-lm' ? 'VS Code LM' : 'Ollama';
           progress.report({ message: `Calling ${providerLabel}...` });
+          setActiveCommand('documentFile');
           const raw = await chat(
             [
               { role: 'system', content: fullSystemPrompt },
@@ -232,6 +234,7 @@ ${codeBundle}`;
             try {
               const { system, user } = docType.prompt(ctx);
               const systemWithLang = langNote ? `${system}\n\n---\n\n${langNote}` : system;
+              setActiveCommand('documentProject');
               const content = await chat(
                 [
                   { role: 'system', content: systemWithLang },
@@ -272,7 +275,15 @@ ${codeBundle}`;
     );
   });
 
-  context.subscriptions.push(command, analyzeCommand, graphCommand, settingsCommand, projectCommand);
+  const dashboardCommand = vscode.commands.registerCommand('docsAgent.showDashboard', () => {
+    if (!codeGraph) {
+      vscode.window.showWarningMessage('Docs Agent: Graph is still building. Try again in a moment.');
+      return;
+    }
+    DashboardPanel.createOrShow(context, codeGraph, roots);
+  });
+
+  context.subscriptions.push(command, analyzeCommand, graphCommand, settingsCommand, projectCommand, dashboardCommand);
 }
 
 function renderImpactDoc(symbol: string, impact: ImpactSummary, nodes: number, edges: number): string {
@@ -378,6 +389,7 @@ async function initGraph(ctx: vscode.ExtensionContext, roots: string[]): Promise
       }
       try {
         codeGraph = mergeFromGraphify(roots);
+        DashboardPanel.updateGraph(codeGraph);
         console.log(`[Docs Agent] Graph ready — ${codeGraph.nodeCount} nodes, ${codeGraph.edgeCount} edges`);
       } catch (err) {
         console.error('[Docs Agent] Graph reload failed:', err);
@@ -390,6 +402,7 @@ async function initGraph(ctx: vscode.ExtensionContext, roots: string[]): Promise
     ctx.subscriptions.push(watchGraphJson(root, () => {
       try {
         codeGraph = mergeFromGraphify(roots);
+        DashboardPanel.updateGraph(codeGraph);
         console.log(`[Docs Agent] Graph refreshed — ${codeGraph!.nodeCount} nodes`);
       } catch (err) {
         console.error('[Docs Agent] Graph watch reload failed:', err);
