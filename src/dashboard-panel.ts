@@ -248,7 +248,7 @@ export class DashboardPanel {
       vscode.window.showErrorMessage(`Docs Agent: File is outside the workspace: ${file}`);
       return;
     }
-    const doc       = await vscode.workspace.openTextDocument(file);
+    const doc       = await vscode.workspace.openTextDocument(vscode.Uri.file(realPath));
     const selection = line !== undefined ? new vscode.Range(line - 1, 0, line - 1, 0) : undefined;
     await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside, selection });
   }

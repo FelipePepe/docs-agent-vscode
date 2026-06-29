@@ -37,8 +37,19 @@ export function assertSafeUrl(url: string): void {
     throw new Error(`Ollama URL must use http or https. Got: ${parsed.protocol}`);
   }
   const hostname = resolveIpv4Mapped(parsed.hostname.toLowerCase().replace(/^\[|\]$/g, ''));
-  if (hostname.startsWith('169.254.') || hostname === 'fd00:ec2::254') {
-    throw new Error('Ollama URL must not target cloud metadata endpoints.');
+
+  const BLOCKED = [
+    /^169\.254\./,                    // link-local / AWS metadata
+    /^10\./,                          // RFC 1918
+    /^172\.(1[6-9]|2\d|3[01])\./,    // RFC 1918
+    /^192\.168\./,                    // RFC 1918
+    /^100\.64\./,                     // CGNAT
+    /^0\./,                           // "this" network
+  ];
+  const BLOCKED_EXACT = new Set(['fd00:ec2::254', '::1', 'fe80::1']);
+
+  if (BLOCKED.some(r => r.test(hostname)) || BLOCKED_EXACT.has(hostname)) {
+    throw new Error(`Ollama URL targets a restricted network address: ${hostname}`);
   }
 }
 
@@ -49,6 +60,8 @@ export interface OllamaResult {
 }
 
 export async function chat(messages: OllamaMessage[], config: OllamaConfig): Promise<OllamaResult> {
+  assertSafeUrl(config.url);
+
   let response: Response;
 
   try {
