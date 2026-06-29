@@ -33,6 +33,14 @@ export interface GraphifyJson {
   multigraph?: boolean;
 }
 
+// ── Resolved binary (pinned once at activation) ───────────────────────────────
+
+let _graphifyBin: string | null = null;
+
+export function setCachedBin(bin: string): void {
+  _graphifyBin = bin;
+}
+
 // ── Paths ─────────────────────────────────────────────────────────────────────
 
 export function graphOutPath(workspaceRoot: string): string {
@@ -73,10 +81,15 @@ export function runGraphify(
   progress?: vscode.Progress<{ message?: string }>,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    const bin = _graphifyBin;
+    if (!bin) {
+      reject(new Error('graphify binary not resolved — activate the extension first'));
+      return;
+    }
     const args = update ? ['update', '.'] : ['.'];
-    const proc = cp.spawn('graphify', args, {
+    const proc = cp.spawn(bin, args, {
       cwd:   workspaceRoot,
-      shell: true,                    // resolves PATH from user shell (uv/pip installs)
+      shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       env:   { ...process.env },
     });
@@ -114,9 +127,22 @@ export function getGraphInfo(workspaceRoot: string): GraphInfo {
 
 // ── graph.json I/O ────────────────────────────────────────────────────────────
 
+const MAX_GRAPH_JSON_BYTES = 50 * 1024 * 1024; // 50 MB
+
 export function loadGraphJson(workspaceRoot: string): GraphifyJson | null {
+  const p = graphOutPath(workspaceRoot);
   try {
-    return JSON.parse(fs.readFileSync(graphOutPath(workspaceRoot), 'utf8')) as GraphifyJson;
+    const stat = fs.statSync(p);
+    if (stat.size > MAX_GRAPH_JSON_BYTES) {
+      console.warn(`[Docs Agent] graph.json is ${stat.size} bytes — exceeds 50 MB limit, skipping`);
+      return null;
+    }
+    const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+    if (!raw || !Array.isArray(raw.nodes)) {
+      console.warn('[Docs Agent] graph.json: "nodes" is not an array — skipping');
+      return null;
+    }
+    return raw as GraphifyJson;
   } catch {
     return null;
   }

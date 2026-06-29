@@ -87,8 +87,9 @@ C# has no dependency resolution yet. Context is formatted as a multi-section bun
 Markdown files injected as the system prompt when documenting language-specific files:
 - `springboot.md` — injected for `.java` files
 - `webforms.md` — injected for `.cs` files
+- `angular.md` — injected for `.ts` files **only when** `package.json` contains `"@angular/core"`
 
-Add new primers by creating a `.md` file and extending `loadPrimer` in `extension.ts`.
+`loadPrimer` in `extension.ts` requires `workspaceRoot` to check the manifest. Add new primers by creating a `.md` file and extending `loadPrimer`.
 
 ## Key constraints
 

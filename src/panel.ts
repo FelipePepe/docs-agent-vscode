@@ -99,7 +99,7 @@ export class GraphPanel {
     if (!inWorkspace) {
       throw new Error(`File is outside the workspace: ${file}`);
     }
-    const doc = await vscode.workspace.openTextDocument(file);
+    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(realPath));
     const selection = line !== undefined
       ? new vscode.Range(line - 1, 0, line - 1, 0)
       : undefined;
