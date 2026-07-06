@@ -342,6 +342,33 @@ Group by controller/resource. Only document endpoints present in the code.`,
     }),
   },
 
+  // ── Data Dictionary (Cuaderno de Carga) ─────────────────────────────────────
+  {
+    id:         'data-dictionary',
+    label:      'Data Dictionary',
+    detail:     'Every table with its fields, types, constraints, and descriptions',
+    category:   'Technical',
+    outputPath: 'docs/data-dictionary.md',
+    prompt: ctx => ({
+      system: `${groundingRules(ctx)}
+Produce a Data Dictionary (cuaderno de carga) for every table, entity, or collection found in the codebase.
+For each table/entity:
+
+### <TableName>
+**Table/Collection:** <name>
+| Field | Type | Constraints | Default | Index | Foreign Key | Description |
+|-------|------|-------------|---------|-------|-------------|-------------|
+
+Then add a Relationships section:
+## Relationships
+| Table | Field | References | Type |
+|-------|-------|------------|------|
+
+Only document tables/entities found in the code (models, entities, schema definitions, migration files).`,
+      user: `Generate the complete data dictionary for this project.\n\n${codeBundle(ctx)}`,
+    }),
+  },
+
   // ── Data Model ───────────────────────────────────────────────────────────────
   {
     id:         'data-model',
@@ -376,6 +403,189 @@ For each entity/table:
 
 Only document entities found in the code (models, entities, DTOs, schema definitions).`,
       user: `Document the data model.\n\n${codeBundle(ctx)}`,
+    }),
+  },
+
+  // ── Contributing Guide ───────────────────────────────────────────────────────
+  {
+    id:         'contributing',
+    label:      'Contributing Guide',
+    detail:     'How to contribute, local setup, PR policy, and coding conventions',
+    category:   'General',
+    outputPath: 'docs/contributing.md',
+    prompt: ctx => ({
+      system: `${groundingRules(ctx)}
+Write a Contributing Guide with:
+# Contributing to <project name>
+## Development Environment Setup
+Required tools, versions, and setup steps.
+## Project Structure
+Brief description of folder organization.
+## How to Build and Run
+Build commands, test commands, how to start the app locally.
+## Coding Conventions
+Naming conventions, code style, commit message format (conventional commits).
+## Pull Request Process
+Branch naming, PR template, review process, merge policy.
+## Testing
+How to run tests, coverage requirements, test structure.`,
+      user: `Write the contributing guide.\n\n${codeBundle(ctx)}`,
+    }),
+  },
+
+  // ── Testing Strategy ─────────────────────────────────────────────────────────
+  {
+    id:         'testing-strategy',
+    label:      'Testing Strategy',
+    detail:     'Test types, coverage goals, and how to run the test suite',
+    category:   'Technical',
+    outputPath: 'docs/testing-strategy.md',
+    prompt: ctx => ({
+      system: `${groundingRules(ctx)}
+Write a Testing Strategy document with:
+# Testing Strategy: <project name>
+## Test Pyramid
+Unit / Integration / E2E test breakdown.
+## Test Frameworks and Tools
+Frameworks used, configuration files, test runner setup.
+## Test Structure and Conventions
+Naming conventions, folder organization, mock strategies.
+## Coverage Requirements
+Target coverage percentages, what must be covered.
+## Running Tests
+Commands for running all tests, specific suites, coverage reports.
+## CI/CD Integration
+How tests run in the pipeline (if inferable from config files).`,
+      user: `Write the testing strategy.\n\n${codeBundle(ctx)}`,
+    }),
+  },
+
+  // ── Changelog / Release Notes ────────────────────────────────────────────────
+  {
+    id:         'changelog',
+    label:      'Changelog / Release Notes',
+    detail:     'Version history with categorized changes per release',
+    category:   'General',
+    outputPath: 'docs/changelog.md',
+    prompt: ctx => ({
+      system: `${groundingRules(ctx)}
+Generate a changelog from the git commit history. Format:
+## [Unreleased]
+### Added
+- <feature>
+### Changed
+- <change>
+### Fixed
+- <fix>
+### Removed
+- <removal>
+
+Use conventional commit types (feat, fix, chore, docs, refactor, etc.). Group by type, not by author. Keep each entry to one line. Omit merge commits and trivial changes.`,
+      user: `Generate the changelog from git history.\n\n${codeBundle(ctx)}`,
+    }),
+  },
+
+  // ── Security Policy ──────────────────────────────────────────────────────────
+  {
+    id:         'security-policy',
+    label:      'Security Policy',
+    detail:     'Security practices, vulnerability reporting, and data protection',
+    category:   'Technical',
+    outputPath: 'docs/security-policy.md',
+    prompt: ctx => ({
+      system: `${groundingRules(ctx)}
+Write a Security Policy document with:
+# Security Policy: <project name>
+## Authentication and Authorization
+How users are authenticated, authorization model, token management.
+## Data Protection
+Encryption at rest/in transit, PII handling, data retention.
+## Input Validation
+How user input is validated, sanitization strategies, injection prevention.
+## Dependencies and Supply Chain
+Dependency management, vulnerability scanning practices.
+## Security Configuration
+Key security settings, headers, CORS, CSRF protection.
+## Vulnerability Reporting
+How to report security issues (if inferable from code/docs).`,
+      user: `Write the security policy.\n\n${codeBundle(ctx)}`,
+    }),
+  },
+
+  // ── Onboarding Guide ─────────────────────────────────────────────────────────
+  {
+    id:         'onboarding',
+    label:      'Onboarding Guide',
+    detail:     'Step-by-step setup for new developers joining the project',
+    category:   'General',
+    outputPath: 'docs/onboarding.md',
+    prompt: ctx => ({
+      system: `${groundingRules(ctx)}
+Write an Onboarding Guide for new developers with:
+# Onboarding Guide: <project name>
+## Prerequisites
+What to install before starting (runtime, tools, editors).
+## Clone and Setup
+Step-by-step commands to clone, install dependencies, configure.
+## First Run
+How to start the application for the first time.
+## Development Workflow
+Branch strategy, commit conventions, how to submit changes.
+## Key Files and Folders
+Important files every developer should know.
+## Common Issues and Fixes
+Setup problems new developers typically encounter and their solutions.`,
+      user: `Write the onboarding guide.\n\n${codeBundle(ctx)}`,
+    }),
+  },
+
+  // ── Troubleshooting / FAQ ────────────────────────────────────────────────────
+  {
+    id:         'troubleshooting',
+    label:      'Troubleshooting / FAQ',
+    detail:     'Common problems, error messages, and their solutions',
+    category:   'General',
+    outputPath: 'docs/troubleshooting.md',
+    prompt: ctx => ({
+      system: `${groundingRules(ctx)}
+Write a Troubleshooting Guide based on error handling patterns in the codebase:
+# Troubleshooting Guide: <project name>
+## Common Startup Errors
+Errors from initialization, configuration, and connection code.
+## Common Runtime Errors
+Errors from request handling, data access, and business logic.
+## Configuration Issues
+Misconfiguration symptoms and fixes.
+## Performance Issues
+Known bottlenecks, caching strategies, optimization tips.
+## FAQ
+Frequently asked questions derived from error messages and comments in the code.`,
+      user: `Write the troubleshooting guide.\n\n${codeBundle(ctx)}`,
+    }),
+  },
+
+  // ── Monitoring & Observability ───────────────────────────────────────────────
+  {
+    id:         'monitoring',
+    label:      'Monitoring & Observability',
+    detail:     'Logging, metrics, health checks, and tracing infrastructure',
+    category:   'Technical',
+    outputPath: 'docs/monitoring.md',
+    prompt: ctx => ({
+      system: `${groundingRules(ctx)}
+Write a Monitoring & Observability document with:
+# Monitoring & Observability: <project name>
+## Logging Strategy
+Log levels, log format, log destinations (files, stdout, external services).
+## Health Checks
+Health/readiness endpoints found in the code.
+## Metrics and Monitoring
+Metrics collection, monitoring tools, dashboards (if inferable from config).
+## Tracing and Debugging
+Distributed tracing setup, debugging configuration.
+## Alerting
+Alert thresholds and notification channels (if inferable from config).`,
+      user: `Write the monitoring and observability guide.\n\n${codeBundle(ctx)}`,
     }),
   },
 
