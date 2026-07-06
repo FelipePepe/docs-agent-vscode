@@ -2,8 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { CbmManager } from './cbm-runner';
-import { CodeGraph, fromGraphifyJson } from './graph';
-import { loadGraphJson, runGraphify } from './graphify-runner';
+import { CodeGraph } from './graph';
 
 type WebviewMessage =
   | { type: 'search';   query: string  }
@@ -122,36 +121,12 @@ export class GraphPanel {
       return;
     }
 
-    const folders = vscode.workspace.workspaceFolders ?? [];
-    if (folders.length === 0) return;
-
-    this.panel.webview.postMessage({ type: 'reloading' });
-    void (async () => {
-      try {
-        const merged = new CodeGraph();
-        for (const folder of folders) {
-          const root = folder.uri.fsPath;
-          await runGraphify(root, true);
-          const json = loadGraphJson(root);
-          if (!json) continue;
-          const g = fromGraphifyJson(json, root);
-          for (const node of g.nodes.values())    merged.addNode(node);
-          for (const e of g.callEdges)            merged.addCallEdge(e);
-          for (const e of g.tableEdges)           merged.addTableEdge(e);
-          for (const e of g.implementsEdges)      merged.addImplementsEdge(e);
-          for (const e of g.injectsEdges)         merged.addInjectsEdge(e);
-        }
-        this.graph = merged;
-        this.panel.webview.postMessage({
-          type:      'stats',
-          nodeCount: this.graph.nodeCount,
-          edgeCount: this.graph.edgeCount,
-        });
-        this.sendOverviewGraph();
-      } catch (err) {
-        vscode.window.showErrorMessage(`Docs Agent: Re-index failed — ${(err as Error).message}`);
-      }
-    })();
+    // No CBM — graph stays empty; nothing to reload.
+    this.panel.webview.postMessage({
+      type:      'stats',
+      nodeCount: this.graph.nodeCount,
+      edgeCount: this.graph.edgeCount,
+    });
   }
 
   private sendOverviewGraph(): void {
@@ -226,15 +201,8 @@ export class GraphPanel {
     const MAX_EDGES = 400;
 
     // callEdges store callee as a simple method name ("save"), not a full symbol
-    // ("OrderRepository.save"). Build a suffix map for O(1) resolution.
-    const suffixMap = new Map<string, string[]>();
-    for (const sym of this.graph.nodes.keys()) {
-      const simple = sym.includes('.') ? sym.split('.').pop()! : sym;
-      if (!suffixMap.has(simple)) suffixMap.set(simple, []);
-      suffixMap.get(simple)!.push(sym);
-    }
-
-    // Rank every node by degree — resolve call callees via suffix map
+    // ("OrderRepository.save") — resolve via the graph's suffix index.
+    // Rank every node by degree — resolve call callees via suffix index
     const degree = new Map<string, number>();
     for (const n of this.graph.nodes.keys()) degree.set(n, 0);
 
@@ -244,7 +212,7 @@ export class GraphPanel {
 
     for (const e of this.graph.callEdges) {
       bump(e.caller);
-      for (const full of suffixMap.get(e.callee) ?? []) bump(full);
+      for (const full of this.graph.nodesBySuffix(e.callee)) bump(full);
     }
     for (const e of this.graph.implementsEdges) {
       if (degree.has(e.implementor) && degree.has(e.contract)) {
@@ -289,7 +257,7 @@ export class GraphPanel {
     for (const e of this.graph.callEdges) {
       if (edgeList.length >= MAX_EDGES) break;
       if (!nodeSet.has(e.caller)) continue;
-      for (const full of suffixMap.get(e.callee) ?? []) {
+      for (const full of this.graph.nodesBySuffix(e.callee)) {
         if (nodeSet.has(full) && full !== e.caller) {
           edgeList.push({ source: e.caller, target: full, label: 'calls' });
         }
@@ -391,18 +359,18 @@ export class GraphPanel {
       edgeList.push({ source: nodeId, target: tid, label: t.operation });
     }
 
-    // Callees — match simple method name against known nodes
-    const callees = this.graph.callEdges
-      .filter(e => e.caller === nodeId)
-      .slice(0, 10);
+    // Callees — match simple method name against known nodes via the suffix
+    // index; the endsWith filter keeps dotted callees ("Repo.save") exact.
+    const callees = this.graph.callEdgesFrom(nodeId).slice(0, 10);
 
     for (const c of callees) {
-      const matches = [...this.graph.nodes.values()]
-        .filter(n => n.symbol.endsWith('.' + c.callee) || n.symbol === c.callee)
+      const lastSegment = c.callee.split('.').pop() ?? c.callee;
+      const matches = this.graph.nodesBySuffix(lastSegment)
+        .filter(sym => sym === c.callee || sym.endsWith('.' + c.callee))
         .slice(0, 3);
-      for (const m of matches) {
-        nodeSet.add(m.symbol);
-        edgeList.push({ source: nodeId, target: m.symbol, label: 'calls' });
+      for (const sym of matches) {
+        nodeSet.add(sym);
+        edgeList.push({ source: nodeId, target: sym, label: 'calls' });
       }
     }
 
