@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { CbmManager } from './cbm-runner';
-import { CodeGraph } from './graph';
+import { CBM_CALLER_LABELS, CodeGraph } from './graph';
 
 type WebviewMessage =
   | { type: 'search';   query: string  }
@@ -426,16 +426,16 @@ export class GraphPanel {
 
     try {
       const { rows: outRows } = await this.cbm!.queryGraph(
-        `MATCH (n {name: '${safe}'})-[:CALLS]->(m) WHERE m.file IS NOT NULL ` +
-        `RETURN m.name AS name, m.label AS label, m.file AS file, m.line AS line LIMIT 15`,
+        `MATCH (n:${CBM_CALLER_LABELS} {name: '${safe}'})-[:CALLS]->(m) WHERE m.file_path IS NOT NULL ` +
+        `RETURN m.name AS name, m.label AS label, m.file_path AS file, m.start_line AS line LIMIT 15`,
       );
       for (const r of outRows as { name?: string; label?: string; file?: string; line?: number }[]) {
         addNeighbor(r, nodeId, r.name!);
       }
 
       const { rows: inRows } = await this.cbm!.queryGraph(
-        `MATCH (m)-[:CALLS]->(n {name: '${safe}'}) WHERE m.file IS NOT NULL ` +
-        `RETURN m.name AS name, m.label AS label, m.file AS file, m.line AS line LIMIT 15`,
+        `MATCH (m:${CBM_CALLER_LABELS})-[:CALLS]->(n {name: '${safe}'}) WHERE m.file_path IS NOT NULL ` +
+        `RETURN m.name AS name, m.label AS label, m.file_path AS file, m.start_line AS line LIMIT 15`,
       );
       for (const r of inRows as { name?: string; label?: string; file?: string; line?: number }[]) {
         addNeighbor(r, r.name!, nodeId);

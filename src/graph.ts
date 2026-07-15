@@ -218,6 +218,12 @@ export class CodeGraph {
 // Labels in codebase-memory-mcp that carry no symbol-level information.
 const CBM_SKIP_LABELS = new Set(['File', 'Folder', 'Module', 'Variable', 'Import']);
 
+// codebase-memory-mcp's Cypher subset only traverses a relationship when the
+// *source* node of the pattern carries an explicit label — `MATCH (a)-[:CALLS]->(b)`
+// silently matches nothing, even though the edges exist (confirmed against a
+// live index). All CALLS-traversal queries must bind the source label from this set.
+export const CBM_CALLER_LABELS = 'Function|Method|Class|Constructor';
+
 export async function fromCbmQuery(cbm: CbmManager, workspaceRoot: string): Promise<CodeGraph> {
   const graph = new CodeGraph();
 
@@ -251,8 +257,8 @@ export async function fromCbmQuery(cbm: CbmManager, workspaceRoot: string): Prom
   const loadCalls = async (): Promise<void> => {
     try {
       const { rows } = await cbm.queryGraph(
-        'MATCH (a)-[:CALLS]->(b) WHERE a.file IS NOT NULL AND b.file IS NOT NULL ' +
-        'RETURN a.qualified_name AS caller, a.file AS cf, a.line AS cl, b.qualified_name AS callee',
+        `MATCH (a:${CBM_CALLER_LABELS})-[:CALLS]->(b) WHERE a.file_path IS NOT NULL AND b.file_path IS NOT NULL ` +
+        'RETURN a.qualified_name AS caller, a.file_path AS cf, a.start_line AS cl, b.qualified_name AS callee',
         5000,
       );
       for (const r of rows as { caller?: string; cf?: string; cl?: number; callee?: string }[]) {
@@ -270,7 +276,7 @@ export async function fromCbmQuery(cbm: CbmManager, workspaceRoot: string): Prom
   const loadImplements = async (): Promise<void> => {
     try {
       const { rows } = await cbm.queryGraph(
-        'MATCH (a)-[:IMPLEMENTS]->(b) ' +
+        'MATCH (a:Class|Interface)-[:IMPLEMENTS]->(b) ' +
         'RETURN a.qualified_name AS implementor, b.qualified_name AS contract',
         2000,
       );
