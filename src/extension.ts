@@ -6,6 +6,7 @@ import { CbmManager, createCbmManager, isCbmAlive } from './cbm-runner';
 import { DOC_TYPES } from './doctypes';
 import { DashboardPanel } from './dashboard-panel';
 import { CodeGraph, ImpactSummary, fromCbmQuery } from './graph';
+import { ArchitectureData, buildGraphContextForDoc } from './graph-context';
 import { chat, getLlmConfig, setActiveCommand } from './llm';
 import { GraphPanel } from './panel';
 import { buildProjectContext } from './project-context';
@@ -254,13 +255,14 @@ function registerDocumentProjectCommand(): vscode.Disposable {
           const language   = cfg.get<string>('language', 'english');
           const langNote   = languageInstruction(language);
 
-          // Fetch architecture overview once and inject into every doc type prompt
-          let architectureContext = '';
+          // Fetch the full architecture once; each doc type below selects its own
+          // relevant slice (+ targeted queries) instead of receiving the same dump.
+          let architecture: ArchitectureData = {};
           const cbmForRoot = cbmManagers.get(root);
           if (cbmForRoot) {
             try {
               progress.report({ message: 'Fetching architecture overview…', increment: 0 });
-              architectureContext = await cbmForRoot.getArchitecture();
+              architecture = JSON.parse(await cbmForRoot.getArchitecture(['all'])) as ArchitectureData;
             } catch (err) {
               console.warn('[Docs Agent] Architecture fetch failed:', err);
             }
@@ -280,8 +282,11 @@ function registerDocumentProjectCommand(): vscode.Disposable {
 
             try {
               const { system, user } = docType.prompt(ctx);
-              const systemWithArch = architectureContext
-                ? `${system}\n\n---\n## Code Graph Architecture Analysis\n\n${architectureContext}`
+              const graphContext = cbmForRoot
+                ? await buildGraphContextForDoc(architecture, cbmForRoot, docType.id)
+                : '';
+              const systemWithArch = graphContext
+                ? `${system}\n\n---\n## Code Graph Analysis\n\n${graphContext}`
                 : system;
               const systemWithLang = langNote ? `${systemWithArch}\n\n---\n\n${langNote}` : systemWithArch;
               setActiveCommand('documentProject');

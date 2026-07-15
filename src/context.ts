@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { CbmManager } from './cbm-runner';
+import { CBM_CALLER_LABELS } from './graph';
 
 export interface FileContext {
   primary: { filePath: string; content: string };
@@ -96,10 +97,10 @@ export async function buildContextWithCbm(
   let depQns: { qn: string; file: string }[] = [];
   try {
     const { rows } = await cbm.queryGraph(
-      `MATCH (caller)-[:CALLS]->(callee) ` +
-      `WHERE caller.file = '${safePath}' ` +
-      `AND callee.file IS NOT NULL AND callee.file <> '${safePath}' ` +
-      `RETURN DISTINCT callee.qualified_name AS qn, callee.file AS file LIMIT 15`,
+      `MATCH (caller:${CBM_CALLER_LABELS})-[:CALLS]->(callee) ` +
+      `WHERE caller.file_path = '${safePath}' ` +
+      `AND callee.file_path IS NOT NULL AND callee.file_path <> '${safePath}' ` +
+      `RETURN DISTINCT callee.qualified_name AS qn, callee.file_path AS file LIMIT 15`,
     );
     depQns = rows as { qn: string; file: string }[];
   } catch { /* graph not ready or query unsupported — use base context */ }
