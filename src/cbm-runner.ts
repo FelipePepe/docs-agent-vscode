@@ -66,6 +66,23 @@ export class CbmManager {
     await this.client.callTool('index_repository', { repo_path: this.repoPath, mode });
   }
 
+  /**
+   * Whether this project has actually been indexed by CBM — distinct from the
+   * server being reachable (isCbmAlive only checks the HTTP process, not any
+   * particular project). Any failure (project never indexed, server error,
+   * unexpected response shape) is treated as "not indexed" — this is a status
+   * signal, not something callers should need to distinguish further.
+   */
+  async indexStatus(): Promise<{ indexed: boolean; status?: string }> {
+    try {
+      const raw = await this.client.callTool('index_status', { project: this.project });
+      const parsed = JSON.parse(raw) as { status?: string };
+      return { indexed: parsed.status === 'ready', status: parsed.status };
+    } catch {
+      return { indexed: false };
+    }
+  }
+
   async getArchitecture(aspects?: string[]): Promise<string> {
     return this.client.callTool('get_architecture', {
       project: this.project,
