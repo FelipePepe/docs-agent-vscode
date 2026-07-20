@@ -85,6 +85,10 @@ C# has no dependency resolution yet. Context is formatted as a multi-section bun
 
 **Settings panel** (`src/settings-panel.ts` + `src/webview/settings-panel.ts`): Simple form that reads/writes VS Code configuration via `postMessage`.
 
+### Chat participant (`src/chat-participant.ts`)
+
+Registers `@docs-agent` via `vscode.chat.createChatParticipant` (requires VS Code 1.95+, bumped in `engines.vscode`). Thin layer only: `/document`, `/project`, `/graph`, `/dashboard`, `/settings` delegate to the equivalent `docsAgent.*` command via `vscode.commands.executeCommand` and reuse its existing UX — no logic is duplicated here. `/impact` (and a bare mention with no slash command) is the one exception, rendered natively via `codeGraph.queryImpact()` + `renderImpactDoc()` (moved to `src/graph.ts` so both the chat participant and `docsAgent.analyzeImpact` can use it) streamed straight into the chat response instead of opening an editor tab.
+
 ### Project documentation suite (`src/doctypes.ts`)
 
 `DOC_TYPES` is a catalog of 11 document types (README, ADR, C4 diagrams, user stories, specs, API reference, data model, deployment guide, glossary). Each entry defines a `prompt(ctx)` factory returning `{ system, user }`. All system prompts share a grounding rules preamble that forbids inventing features not present in the code.

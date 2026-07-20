@@ -25,6 +25,25 @@ Every piece of documentation Docs Agent generates must be grounded in the actual
 
 ---
 
+## Chat
+
+Type `@docs-agent` in VS Code's chat view for the same functionality without leaving the keyboard:
+
+| Command | Description |
+|---|---|
+| `@docs-agent /document` | Document the active file. |
+| `@docs-agent /project` | Generate the project documentation suite. |
+| `@docs-agent /impact <symbol>` | Analyze impact, rendered directly in the chat response. |
+| `@docs-agent /graph` | Open the interactive code graph panel. |
+| `@docs-agent /dashboard` | Open the dashboard panel. |
+| `@docs-agent /settings` | Open Docs Agent settings. |
+
+You can also mention `@docs-agent` with just a symbol name and no command to run impact analysis on it directly.
+
+Requires VS Code 1.95 or newer.
+
+---
+
 ## Setup
 
 ### Option 1 — Ollama (default)
