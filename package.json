@@ -4,9 +4,9 @@
   "displayName": "Docs Agent",
   "description": "Anti-hallucination documentation generator powered by local Ollama",
   "icon": "media/icon.png",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.95.0"
   },
   "categories": [
     "Other"
@@ -38,6 +38,22 @@
       {
         "command": "docsAgent.showDashboard",
         "title": "Docs Agent: Show dashboard"
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "docsAgent.participant",
+        "name": "docs-agent",
+        "description": "Document files, analyze impact, and open the code graph — right from chat.",
+        "isSticky": true,
+        "commands": [
+          { "name": "document", "description": "Document the active file (same as Docs Agent: Document this file)" },
+          { "name": "project", "description": "Generate the project documentation suite" },
+          { "name": "impact", "description": "Analyze impact of a symbol — usage: /impact ClassName.method" },
+          { "name": "graph", "description": "Open the interactive code graph panel" },
+          { "name": "dashboard", "description": "Open the graph stats / token usage dashboard" },
+          { "name": "settings", "description": "Open Docs Agent settings" }
+        ]
       }
     ],
     "configuration": {

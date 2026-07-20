@@ -32,8 +32,24 @@ export const Uri = {
   },
 };
 
+let executeCommandCalls: string[] = [];
+
+export function __resetExecuteCommand(): void {
+  executeCommandCalls = [];
+}
+
+export function __getExecuteCommandCalls(): string[] {
+  return executeCommandCalls;
+}
+
 export const commands = {
-  async executeCommand(): Promise<void> {
-    /* no-op in tests */
+  async executeCommand(command: string): Promise<void> {
+    executeCommandCalls.push(command);
+  },
+};
+
+export const chat = {
+  createChatParticipant(id: string, requestHandler: unknown) {
+    return { id, requestHandler, dispose() { /* no-op in tests */ } };
   },
 };
