@@ -311,3 +311,59 @@ function _parseLine(loc?: string): number {
   const m = /L(\d+)/.exec(loc);
   return m ? parseInt(m[1], 10) : 1;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Shared by the "Analyze impact" command (opens as an editor tab) and the
+// @docs-agent chat participant's /impact command (streamed as a chat response).
+export function renderImpactDoc(symbol: string, impact: ImpactSummary, nodes: number, edges: number): string {
+  const lines: string[] = [
+    `# Impact Analysis: \`${symbol}\``,
+    '',
+    `> Docs Agent graph — ${nodes} nodes · ${edges} edges · ${new Date().toLocaleString()}`,
+    '',
+  ];
+
+  if (impact.implementors.length > 0) {
+    lines.push('## Implementors');
+    lines.push('');
+    for (const impl of impact.implementors) lines.push(`- \`${impl}\``);
+    lines.push('');
+  }
+
+  if (impact.consumers.length > 0) {
+    lines.push('## Consumers (classes that inject this)');
+    lines.push('');
+    for (const c of impact.consumers) lines.push(`- \`${c.symbol}\` — field \`${c.fieldName}\``);
+    lines.push('');
+  }
+
+  if (impact.callers.length > 0) {
+    lines.push('## Callers');
+    lines.push('');
+    for (const c of impact.callers) {
+      const shortFile = c.file.split('/').slice(-2).join('/');
+      lines.push(`- \`${c.symbol}\` — ${shortFile}:${c.line}`);
+    }
+    lines.push('');
+  }
+
+  if (impact.tableRefs.length > 0) {
+    lines.push('## SQL Table References');
+    lines.push('');
+    for (const t of impact.tableRefs) {
+      const shortFile = t.file.split('/').slice(-2).join('/');
+      lines.push(`- \`${t.table}\` (${t.operation}) — \`${t.symbol}\` at ${shortFile}:${t.line}`);
+    }
+    lines.push('');
+  }
+
+  const total = impact.callers.length + impact.implementors.length +
+    impact.consumers.length + impact.tableRefs.length;
+  if (total === 0) {
+    lines.push('*No references found in the indexed workspace.*');
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
